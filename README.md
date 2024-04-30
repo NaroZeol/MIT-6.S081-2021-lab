@@ -4,7 +4,7 @@ MIT 6.S081 2021 lab 个人题解
 
 锐意更新中...
 
-- [ ] Utilities
+- [x] Utilities(https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/Utilities)
 
 - [ ] System calls
 
