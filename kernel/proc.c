@@ -662,7 +662,7 @@ procdump(void)
 
 // Returns the number of processes whose state is not UNUSED
 uint64
-procunused()
+nproc()
 {
   uint64 num = 0;
   struct proc *p;

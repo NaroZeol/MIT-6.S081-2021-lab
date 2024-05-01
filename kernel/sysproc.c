@@ -115,7 +115,7 @@ sys_sysinfo(void){
   struct sysinfo *pinfo;
   struct proc *p;
   uint64 fm;
-  uint64 unusedproc;
+  uint64 up;
 
   if (argaddr(0, (uint64 *)&pinfo) < 0)  
     return -1;
@@ -124,12 +124,12 @@ sys_sysinfo(void){
 
   acquire(&tickslock);
   fm = freemem();
-  unusedproc = procunused();
+  up = nproc();
   release(&tickslock);
 
   if (
     copyout(p->pagetable, (uint64)&(pinfo->freemem), (char *)&fm, sizeof(fm)) != 0 ||
-    copyout(p->pagetable, (uint64)&(pinfo->nproc), (char *)&unusedproc, sizeof(unusedproc)) != 0
+    copyout(p->pagetable, (uint64)&(pinfo->nproc),   (char *)&up, sizeof(up)) != 0
   )
     return -1;
 
