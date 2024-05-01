@@ -6,7 +6,7 @@ MIT 6.S081 2021 lab 个人题解
 
 - [x] [Utilities](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/util)
 
-- [ ] System calls
+- [x] [System calls](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/syscall)
 
 - [ ] Page tables
 
