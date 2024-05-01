@@ -119,6 +119,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->tracemask = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -164,6 +165,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->tracemask = 0;
 }
 
 // Create a user page table for a given process,
@@ -300,6 +302,9 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  // copy trace mask
+  np->tracemask = p->tracemask;
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -653,4 +658,17 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// Returns the number of processes whose state is not UNUSED
+uint64
+procunused()
+{
+  uint64 num = 0;
+  struct proc *p;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    if (p->state != UNUSED)
+      num++;
+  } 
+  return num;
 }
