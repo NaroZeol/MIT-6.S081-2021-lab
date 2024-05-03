@@ -432,3 +432,39 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+// Take a pagetable_t argument, and print that pagetable in the format described below.
+void vmprint(pagetable_t pagetable) {
+  // I have to point out that this code is suck
+  // But once you don't want to write another function to recurrence
+  // You have to write suck code like this
+  if (pagetable == 0)
+    return;
+
+  printf("page table %p\n", pagetable);
+  for (int i = 0; i < 512; ++i) {
+    pte_t top_pte = pagetable[i];
+    if (top_pte & PTE_V) {
+      printf(".. %d: pte %p pa %p\n", i, top_pte, PTE2PA(top_pte));
+
+      if ((PTE_FLAGS(top_pte) & (PTE_R | PTE_W | PTE_X)) == 0) { // not leaf
+        pagetable_t mid_pagetable = (pagetable_t)PTE2PA(top_pte);
+        for (int j = 0; j < 512; ++j) {
+          pte_t mid_pte = mid_pagetable[j];
+          if (mid_pte & PTE_V) {
+            printf(".. .. %d: pte %p pa %p\n", j, mid_pte, PTE2PA(mid_pte));
+
+            if ((PTE_FLAGS(mid_pte) & (PTE_R | PTE_W | PTE_X)) == 0) { // not leaf
+              pagetable_t leaf_pagetable = (pagetable_t)PTE2PA(mid_pte);
+              for (int k = 0; k < 512; ++k) {
+                pte_t leaf_pte = leaf_pagetable[k];
+                if (leaf_pte & PTE_V)
+                  printf(".. .. .. %d: pte %p pa %p\n", k, leaf_pte, PTE2PA(leaf_pte));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
