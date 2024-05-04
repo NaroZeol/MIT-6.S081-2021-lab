@@ -8,7 +8,7 @@
 
 - [x] [System calls](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/syscall)
 
-- [ ] Page tables
+- [x] [Page tables](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/pgtbl)
 
 - [ ] Traps
 
