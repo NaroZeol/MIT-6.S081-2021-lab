@@ -468,3 +468,23 @@ void vmprint(pagetable_t pagetable) {
     }
   }
 }
+
+int
+paccess(pagetable_t pagetable, uint64 va, int len, uint *mask)
+{
+  for (int i = 0; i < len; ++i){
+    pte_t * pte_ptr = walk(pagetable, va, 0);
+    if (pte_ptr == 0){
+      va += PGSIZE;
+      continue;
+    }
+
+    if (*pte_ptr & PTE_A) {
+      *mask = (*mask | (1L << i));
+      *pte_ptr = ((*pte_ptr) & ~(PTE_A));
+    }
+    
+    va += PGSIZE;
+  }
+  return 0;
+}
