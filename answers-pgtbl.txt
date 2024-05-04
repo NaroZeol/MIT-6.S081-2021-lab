@@ -1,0 +1,6 @@
+1. Syscalls which do not need to run kernel code such as getpid, gettimeofday etc.
+
+2. Page 0 contains the text segment.
+   Page 2 is a guard page.
+   Page 1 cannot be write but can be read.
+   Third to last page contain USYSCALL we added in last question.
