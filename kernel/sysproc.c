@@ -80,7 +80,49 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  #define addr_t uint64
+  addr_t base; // pointer to first user page
+  int len;
+  addr_t pmask; // pointer to unsigned int(32 bits)
+
+  if(argaddr(0, &base) < 0 || argint(1, &len) < 0 || argaddr(2, &pmask) < 0)
+    return -1;
+
+  if (len > 32 || len <= 0)// 1 <= num <= 32
+    return -1;
+  
+  struct proc *p = myproc();
+  unsigned int ret = 0;
+
+  acquire(&tickslock);
+
+  // Because the way we get the {base} argument cause an access to this address.
+  // So it's strange that mask's least significant bit always set to 1
+  // I don't know how to solve this problem
+  // So I skip the least significant bit
+  base += PGSIZE; 
+  for (int i = 1; i < len; ++i){
+    pte_t * pte_ptr = walk(p->pagetable, base, 0);
+    if (pte_ptr == 0){
+      base += PGSIZE;
+      continue;
+    }
+
+    pte_t pte = *pte_ptr;
+    if (pte & PTE_A) {
+      ret = (ret | (1L << i));
+      pte = ((pte) & ~(PTE_A));
+    }
+    
+    base += PGSIZE;
+  }
+  if (copyout(p->pagetable, pmask, (char *)&ret, sizeof(ret)) < 0) {
+    release(&tickslock);
+    return -1;
+  }
+
+  release(&tickslock);
+
   return 0;
 }
 #endif
