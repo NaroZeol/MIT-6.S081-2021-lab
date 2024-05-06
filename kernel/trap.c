@@ -84,7 +84,10 @@ usertrap(void)
         xticks = ticks;
         release(&tickslock);
 
-        if (xticks - p->lastticks >= p->alarminterval) {
+        if (p->isinalarm != 1 && xticks - p->lastticks >= p->alarminterval) {
+          p->isinalarm = 1;
+          memmove(p->alarmframe, p->trapframe, PGSIZE);
+
           p->trapframe->epc = p->alarmhandler;
           usertrapret();
         }
