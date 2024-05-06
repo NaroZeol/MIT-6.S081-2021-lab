@@ -10,7 +10,7 @@
 
 - [x] [Page tables](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/pgtbl)
 
-- [ ] Traps
+- [x] [Traps](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/traps)
 
 - [ ] Copy-on-write
 
