@@ -139,9 +139,9 @@ backtrace()
 {
   #define addr_t uint64
   addr_t curr_frame = r_fp();
-
+  addr_t fp = PGROUNDDOWN(curr_frame);
   printf("backtrace:\n");
-  while(PGROUNDUP(curr_frame) != PGROUNDDOWN(curr_frame)) // Why?
+  while(PGROUNDDOWN(curr_frame) == fp)
   {
     printf("%p\n", *(addr_t *)(curr_frame - 8));
     curr_frame = *(addr_t *)(curr_frame - 16);
