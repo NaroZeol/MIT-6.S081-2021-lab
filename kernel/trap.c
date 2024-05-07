@@ -37,7 +37,6 @@ void
 usertrap(void)
 {
   int which_dev = 0;
-
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
@@ -49,8 +48,9 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
-  if(r_scause() == 8){
+
+  uint64 scause = r_scause();
+  if(scause == 8){
     // system call
 
     if(p->killed)
@@ -65,7 +65,33 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  }
+  else if(scause == 15){// 13->load, 15->store, 12->instruction, we should handler store for COW
+    // page fault
+    uint64 faultva = r_stval(); // fault virtual memory address
+    uint64 faultpc = r_sepc(); // the virtual memory address of instruction that cause page fault
+    p->trapframe->epc = faultpc;
+
+    uint64 faultpa = walkaddr(p->pagetable, faultva);
+    if (faultpa == 0){
+      printf("something wrong when handling page fault\n");
+      p->killed = 1;
+    }
+
+    pte_t *pte = walk(p->pagetable, faultva, 0);
+    if ((*pte & PTE_COW) == 0) {
+      printf("page fault...\n");
+      p->killed = 1;
+    }
+    if ((*pte & PTE_V) == 0) {
+      printf("page not present\n");
+      p->killed = 1;
+    }
+
+    // Alloc and Copy!
+    uvmalloccopy(p->pagetable, faultva, faultpa);
+  } 
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);

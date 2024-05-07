@@ -179,8 +179,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
-      uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
+      // uint64 pa = PTE2PA(*pte);
+      // kfree((void*)pa);
     }
     *pte = 0;
   }
@@ -303,7 +303,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  // char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -311,12 +311,10 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+    *pte = (~(PTE_W) & *pte) | PTE_COW; // clear PTE_W, set as COW page
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      panic("uvmcopy: wrong when mappages\n");
       goto err;
     }
   }
@@ -325,6 +323,27 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
  err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
+}
+
+
+// Use for COW
+// Alloc a new page for va and copy to new page
+int uvmalloccopy(pagetable_t pagetable, uint64 va, uint64 oldpa)
+{
+  pte_t *pte = walk(pagetable, PGROUNDDOWN(va), 0);
+  char *mem;
+  int flags = (PTE_FLAGS(*pte) | PTE_W) & (~PTE_COW); // Clear COW
+  if ((mem = kalloc()) == 0) {
+    return -1;
+  }
+  memmove(mem, (char *)PGROUNDDOWN(oldpa), PGSIZE);
+  uvmunmap(pagetable, PGROUNDDOWN(va), 1, 0);
+  if (mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, flags) != 0) {
+    kfree(mem);
+    return -1;
+  }
+
+  return 0;
 }
 
 // mark a PTE invalid for user access.
