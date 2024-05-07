@@ -12,7 +12,7 @@
 
 - [x] [Traps](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/traps)
 
-- [ ] Copy-on-write
+- [x] [Copy-on-write](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/cow)
 
 - [ ] Multithreading
 
