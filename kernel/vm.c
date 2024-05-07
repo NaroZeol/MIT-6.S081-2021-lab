@@ -380,6 +380,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
+
+    pte_t *user_pte = walk(pagetable, va0, 0);
+    if ((*user_pte & PTE_COW) != 0) { // a COW page, should alloc a new page
+      // printf("hit a COW page when copyout\n");
+      uvmalloccopy(pagetable, va0, pa0);
+      pa0 = walkaddr(pagetable, va0); // reset pa0 to new physical address since uvmalloccopy set a new physical address
+    }
     memmove((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;

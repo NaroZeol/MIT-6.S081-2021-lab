@@ -36,7 +36,6 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)USERSTOP);
-  printf("init pgrefcount\n");
   initpgrefcount();
 }
 
