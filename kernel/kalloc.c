@@ -14,6 +14,8 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
+uint16 pgrefcount[REFSIZE];
+
 struct run {
   struct run *next;
 };
@@ -21,21 +23,21 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
-  uint16 *pgrefcount; // page reference count
 } kmem;
 
 void
 initpgrefcount()
 {
-  kmem.pgrefcount = (uint16 *)USERSTOP;
   // memset(kmem.pgrefcount, 128, PGSIZE);
+  for (int i = 0; i != REFSIZE; ++i)
+    pgrefcount[i] = 0;
 }
 
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)USERSTOP);
+  freerange(end, (void*)PHYSTOP);
   initpgrefcount();
 }
 
@@ -60,8 +62,8 @@ pgrefcountinc(uint64 pa)
 
   uint16 ret;
   acquire(&kmem.lock);
-  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
   *num += 1;
   ret = *num;
   release(&kmem.lock);
@@ -81,8 +83,8 @@ pgrefcountdec(uint64 pa)
 
   uint16 ret;
   acquire(&kmem.lock);
-  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
   *num -= 1;
   ret = *num;
   release(&kmem.lock);
@@ -92,7 +94,7 @@ pgrefcountdec(uint64 pa)
 
 // return page reference count by physical address, pa should align to page size
 int
-pgrefcount(uint64 pa)
+pgrefcnt(uint64 pa)
 {
   if (pa % PGSIZE != 0) {
     return -1;
@@ -100,8 +102,8 @@ pgrefcount(uint64 pa)
 
   uint16 ret;
   acquire(&kmem.lock);
-  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
   ret = *num;
   release(&kmem.lock);
 
@@ -116,8 +118,8 @@ pgrefcountset(uint64 pa, uint16 val)
     return -1;
   }
 
-  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
   *num = val;
   return 0;   
 }
@@ -131,7 +133,7 @@ kfree(void *pa)
 {
   struct run *r;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= USERSTOP)
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.

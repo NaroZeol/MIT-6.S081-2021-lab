@@ -69,6 +69,9 @@ usertrap(void)
   else if(scause == 15){// 13->load, 15->store, 12->instruction, we should handler store for COW
     // page fault
     uint64 faultva = r_stval(); // fault virtual memory address
+    if (faultva >= MAXVA) {
+      goto err;
+    }
     uint64 faultpc = r_sepc(); // the virtual memory address of instruction that cause page fault
     p->trapframe->epc = faultpc;
 
@@ -89,11 +92,13 @@ usertrap(void)
     }
 
     // Alloc and Copy!
-    uvmalloccopy(p->pagetable, faultva, faultpa);
+    if (uvmalloccopy(p->pagetable, faultva, faultpa) == -1)
+      p->killed = 1;
   } 
   else if((which_dev = devintr()) != 0){
     // ok
   } else {
+  err:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

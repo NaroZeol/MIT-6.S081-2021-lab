@@ -182,7 +182,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       uint64 pa = PTE2PA(*pte);
       if (pgrefcountdec(pa) == -1)
         panic("uvmunmap: wrong physical address");
-      if (pgrefcount(pa) == 0) // may be race condition
+      if (pgrefcnt(pa) == 0) // may be race condition
         kfree((void*)pa);
     }
     *pte = 0;
@@ -314,7 +314,9 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
-    *pte = (~(PTE_W) & *pte) | PTE_COW; // clear PTE_W, set as COW page
+    if ((*pte & PTE_W) != 0)
+      *pte = (~(PTE_W) & *pte) | PTE_COW; // clear PTE_W, set as COW page
+    
     flags = PTE_FLAGS(*pte);
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
       panic("uvmcopy: wrong when mappages\n");
@@ -384,7 +386,8 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     pte_t *user_pte = walk(pagetable, va0, 0);
     if ((*user_pte & PTE_COW) != 0) { // a COW page, should alloc a new page
       // printf("hit a COW page when copyout\n");
-      uvmalloccopy(pagetable, va0, pa0);
+      if (uvmalloccopy(pagetable, va0, pa0) == -1)
+        return -1;
       pa0 = walkaddr(pagetable, va0); // reset pa0 to new physical address since uvmalloccopy set a new physical address
     }
     memmove((void *)(pa0 + (dstva - va0)), src, n);
