@@ -21,13 +21,23 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  uint16 *pgrefcount; // page reference count
 } kmem;
+
+void
+initpgrefcount()
+{
+  kmem.pgrefcount = (uint16 *)USERSTOP;
+  // memset(kmem.pgrefcount, 128, PGSIZE);
+}
 
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  freerange(end, (void*)USERSTOP);
+  printf("init pgrefcount\n");
+  initpgrefcount();
 }
 
 void
@@ -39,6 +49,80 @@ freerange(void *pa_start, void *pa_end)
     kfree(p);
 }
 
+// increase a page reference count use physical address
+// pa should align to page size
+// return new value when success, -1 when failed
+int
+pgrefcountinc(uint64 pa)
+{
+  if (pa % PGSIZE != 0) {
+    return -1;
+  }
+
+  uint16 ret;
+  acquire(&kmem.lock);
+  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  *num += 1;
+  ret = *num;
+  release(&kmem.lock);
+
+  return ret;
+}
+
+// decrease a page reference count use physical address
+// pa should align to page size
+// return new value when success, -1 when failed
+int
+pgrefcountdec(uint64 pa)
+{
+  if (pa % PGSIZE != 0) {
+    return -1;
+  }
+
+  uint16 ret;
+  acquire(&kmem.lock);
+  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  *num -= 1;
+  ret = *num;
+  release(&kmem.lock);
+
+  return ret;  
+}
+
+// return page reference count by physical address, pa should align to page size
+int
+pgrefcount(uint64 pa)
+{
+  if (pa % PGSIZE != 0) {
+    return -1;
+  }
+
+  uint16 ret;
+  acquire(&kmem.lock);
+  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  ret = *num;
+  release(&kmem.lock);
+
+  return ret;    
+}
+
+// no lock, only for kfree and kalloc
+int
+pgrefcountset(uint64 pa, uint16 val)
+{
+  if (pa % PGSIZE != 0) {
+    return -1;
+  }
+
+  uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
+  uint16 *num = &kmem.pgrefcount[relativeaddr / PGSIZE];
+  *num = val;
+  return 0;   
+}
+
 // Free the page of physical memory pointed at by v,
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
@@ -48,7 +132,7 @@ kfree(void *pa)
 {
   struct run *r;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= USERSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
@@ -74,6 +158,7 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
+  pgrefcountset((uint64)r, 1);
   release(&kmem.lock);
 
   if(r)
