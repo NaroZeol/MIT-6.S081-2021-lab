@@ -15,5 +15,11 @@ mkfs
 kernel/kernel
 user/usys.S
 .gdbinit
-xv6.out
-.vscode
+myapi.key
+*-handin.tar.gz
+xv6.out*
+.vagrant/
+submissions/
+ph
+barrier
+.vscode/
