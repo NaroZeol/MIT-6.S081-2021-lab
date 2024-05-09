@@ -1,0 +1,12 @@
+Some race conditions may occur when using a list form hash table.
+One sequence to cause a failure is as follows:
+    1. Thread A calls put and go into insert.
+    2. A context switch occurs before *p = e is executed.
+    3. Thread B calls put and go into insert.
+    4. Thread B goes into insert and sets *p = e.
+    5. context switch to thread A and execute *p = e.
+
+Suppose that p points to the same bucket in the hash table in both threads.
+After thread B sets *p = e, then thread A sets *p = e.
+Thread A overwrites the value that thread B set.
+This cause a miss and memory leak.
