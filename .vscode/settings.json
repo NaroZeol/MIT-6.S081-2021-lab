@@ -1,0 +1,14 @@
+{
+    "C_Cpp.enhancedColorization": "disabled",
+    "files.associations": {
+        "defs.h": "c",
+        "random": "c",
+        "memory": "c",
+        "riscv.h": "c",
+        "elf.h": "c",
+        "types.h": "c",
+        "proc.h": "c",
+        "memlayout.h": "c",
+        "spinlock.h": "c"
+    }
+}
