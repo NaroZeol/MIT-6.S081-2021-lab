@@ -186,6 +186,11 @@ dns_rep(uint8 *ibuf, int cc)
       if(ip[0] != 198 || ip[1] != 18 || ip[2] != 0 || ip[3] != 176) { 
         // nslookup show pdos.csail.mit.edu's ip is 198.18.0.176
         // I don't know why this is hard-coded
+        
+        // Update:
+        // If a vpn is used, the ip obtained by nslookup will be different
+        // If vpn is not used, the ip will be 128.52.129.126, but then you cannot access to google's DNS server in qemu.🤣
+        // Bad hard-coded !!!!!
         printf("wrong ip address");
         exit(1);
       }
