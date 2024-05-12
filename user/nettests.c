@@ -183,7 +183,9 @@ dns_rep(uint8 *ibuf, int cc)
       printf("DNS arecord for %s is ", qname ? qname : "" );
       uint8 *ip = (ibuf+len);
       printf("%d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
-      if(ip[0] != 128 || ip[1] != 52 || ip[2] != 129 || ip[3] != 126) {
+      if(ip[0] != 198 || ip[1] != 18 || ip[2] != 0 || ip[3] != 176) { 
+        // nslookup show pdos.csail.mit.edu's ip is 198.18.0.176
+        // I don't know why this is hard-coded
         printf("wrong ip address");
         exit(1);
       }

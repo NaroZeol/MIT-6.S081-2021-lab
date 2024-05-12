@@ -101,11 +101,11 @@ struct tx_desc
 {
   uint64 addr;
   uint16 length;
-  uint8 cso;
-  uint8 cmd;
-  uint8 status;
-  uint8 css;
-  uint16 special;
+  uint8 cso;          // CheckSum Offset For TCP
+  uint8 cmd;          // Command Field
+  uint8 status;       // Status Field
+  uint8 css;          // CheckSum Start Field
+  uint16 special;     // Special Field
 };
 
 /* Receive Descriptor bit definitions [E1000 3.2.3.1] */
