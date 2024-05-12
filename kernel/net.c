@@ -355,13 +355,11 @@ fail:
 // networking stack
 void net_rx(struct mbuf *m)
 {
-  // printf("call net_rx\n");
   struct eth *ethhdr;
   uint16 type;
 
   ethhdr = mbufpullhdr(m, *ethhdr);
   if (!ethhdr) {
-    printf("Error when net_rx\n");
     mbuffree(m);
     return;
   }

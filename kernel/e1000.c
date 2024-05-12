@@ -95,7 +95,6 @@ e1000_init(uint32 *xregs)
 int
 e1000_transmit(struct mbuf *m)
 {
-  // printf("Try to handle a transmit\n");
   acquire(&e1000_lock);
   uint16 index = regs[E1000_TDT]; // index of next packet in TX ring
   if (index > TX_RING_SIZE || (tx_ring[index].status & E1000_TXD_STAT_DD) == 0) {
@@ -116,21 +115,15 @@ e1000_transmit(struct mbuf *m)
   regs[E1000_TDT] = (index + 1) % TX_RING_SIZE;
   release(&e1000_lock);
 
-  // printf("Send by tx_ring[%d]\n", index);
-
   return 0;
 } 
 
 static void
 e1000_recv(void)
 {
-  // printf("Try to handle a receive\n");
   uint16 index = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
-  while ((rx_ring[index].status & (E1000_RXD_STAT_DD | E1000_RXD_STAT_EOP)) == 0) {
-    index = (index + 1) % RX_RING_SIZE;
-  }
 
-  while ((rx_ring[index].status & (E1000_RXD_STAT_DD | E1000_RXD_STAT_EOP)) != 0) {
+  while (rx_ring[index].status & (E1000_RXD_STAT_DD)) {
     rx_mbufs[index]->len = rx_ring[index].length;
 
     net_rx(rx_mbufs[index]);
@@ -140,15 +133,12 @@ e1000_recv(void)
       panic("e1000");
     rx_ring[index].addr = (uint64) rx_mbufs[index]->head;
     rx_ring[index].status = 0;
-
-    // printf("Received from rx_ring[%d]\n", index);
     
-    if (rx_ring[(index + 1) % RX_RING_SIZE].status & (E1000_RXD_STAT_DD | E1000_RXD_STAT_EOP))
+    if (rx_ring[(index + 1) % RX_RING_SIZE].status & (E1000_RXD_STAT_DD)) // next is available
       index = (index + 1) % RX_RING_SIZE;
     else
       break;
   }
-  // printf("loop end\n");
   regs[E1000_RDT] = index;
 }
 
