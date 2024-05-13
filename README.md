@@ -16,9 +16,9 @@
 
 - [x] [Multithreading](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/thread)
 
-- [x] [network driver](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/net) 
+- [x] [Network driver](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/net) 
 
-- [ ] Lock
+- [x] [Lock](https://github.com/NaroZeol/MIT-6.S081-2021-lab/tree/lock)
 
 - [ ] File system
 
