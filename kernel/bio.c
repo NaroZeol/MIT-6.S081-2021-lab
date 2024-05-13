@@ -76,15 +76,14 @@ bget(uint dev, uint blockno)
 {
   struct buf *b;
 
-  int index = hash(dev,blockno);
-
-  acquire(&buckets[index].lock);
+  int curr = hash(dev,blockno);
+  acquire(&buckets[curr].lock);
 
   // Is the block already cached?
-  for(b = buckets[index].head.next; b != &buckets[index].head; b = b->next){
+  for(b = buckets[curr].head.next; b != &buckets[curr].head; b = b->next){
     if(b->dev == dev && b->blockno == blockno){
       b->refcnt++;
-      release(&buckets[index].lock);
+      release(&buckets[curr].lock);
       acquiresleep(&b->lock);
       return b;
     }
@@ -92,48 +91,78 @@ bget(uint dev, uint blockno)
 
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
-  for(b = buckets[index].head.prev; b != &buckets[index].head; b = b->prev){
+  for(b = buckets[curr].head.prev; b != &buckets[curr].head; b = b->prev){
     if(b->refcnt == 0) {
       b->dev = dev;
       b->blockno = blockno;
       b->valid = 0;
       b->refcnt = 1;
-      release(&buckets[index].lock);
+      release(&buckets[curr].lock);
       acquiresleep(&b->lock);
       return b;
     }
   }
 
-  // No buffer in bucket[index], get it from global bucket
-  acquire(&bcache.lock);
+  // No buffer in bucket[index], try to get it from global bucket of other buckets
   if (bcache.head.next != bcache.head.prev) {
+    acquire(&bcache.lock);
     b = bcache.head.next;
 
     // detach from global bucket
-    bcache.head.next = bcache.head.next->next;
-    b->next->prev = &bcache.head;
+    b->next->prev = b->prev;
+    b->prev->next = b->next;
 
     // insert to bucket list
-    b->next = buckets[index].head.next;
-    buckets[index].head.next->prev = b;
-    b->prev = &buckets[index].head;
-    buckets[index].head.next = b;
+    b->next = buckets[curr].head.next;
+    buckets[curr].head.next->prev = b;
+    b->prev = &buckets[curr].head;
+    buckets[curr].head.next = b;
 
     b->dev = dev;
     b->blockno = blockno;
     b->valid = 0;
     b->refcnt = 1;
     release(&bcache.lock);
-    release(&buckets[index].lock);
+    release(&buckets[curr].lock);
     acquiresleep(&b->lock);
-    
+
     return b;
   }
-  else
-    panic("bget: no buffers");
+  else {
+    for (int i = 0; i != BUCKETSIZE; ++i) {
+      if (i == curr)
+        continue;
 
-  release(&bcache.lock);
-  release(&buckets[index].lock);
+      acquire(&buckets[i].lock);
+      for(b = buckets[i].head.prev; b != &buckets[i].head; b = b->prev){
+        if(b->refcnt == 0) {
+          // detach from other buckets
+          b->next->prev = b->prev;
+          b->prev->next = b->next;
+
+          // steal
+          b->next = buckets[curr].head.next;
+          buckets[curr].head.next->prev = b;
+          b->prev = &buckets[curr].head;
+          buckets[curr].head.next = b;
+
+          b->dev = dev;
+          b->blockno = blockno;
+          b->valid = 0;
+          b->refcnt = 1;
+
+          release(&buckets[i].lock);
+          release(&buckets[curr].lock);
+          acquiresleep(&b->lock);
+
+          return b;
+        }
+      }
+      release(&buckets[i].lock);
+    }
+  }
+
+  panic("bget: no buffers");
   return 0;
 }
 
