@@ -225,6 +225,11 @@ sys_unlink(void)
   iunlockput(dp);
 
   ip->nlink--;
+  if(ip->nlink == 0 && ip->type == T_SYMLINK){ 
+    // since we use addrs which should be addr of used block in a normal file
+    // we must need to set them to zero to avoid free important blocks 
+    memset(ip->addrs, 0, sizeof(uint)*(NDIRECT+2));
+  }
   iupdate(ip);
   iunlockput(ip);
 
@@ -283,6 +288,45 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+static struct inode*
+symlink_walk(struct inode* src)
+{
+  char newpath[MAXPATH];
+  uint trace[10]; //max depth of links is 10;
+  int traceIdx = 0;
+  struct inode* ip = src;
+  
+  strncpy(newpath, (const char *)ip->addrs, strlen((const char *)ip->addrs));
+  trace[traceIdx++] = ip->inum;
+  iunlockput(ip);
+  
+  while (1){
+    if((ip = namei(newpath)) == 0){
+      return 0;
+    }
+    ilock(ip);
+    for (int i = 0; i != traceIdx; ++i){ // check cycle link
+      if (ip->inum == trace[i]){
+        iunlockput(ip);
+        return 0;
+      }
+    }
+
+    if(ip->type != T_SYMLINK){
+      break;
+    }
+    else{
+      strncpy(newpath, (const char *)ip->addrs, strlen((const char *)ip->addrs));
+      trace[traceIdx++] = ip->inum;
+      iunlockput(ip);
+      if (traceIdx == 10){ // if reach depth threshold
+        return 0;
+      }
+    }
+  }
+  return ip;
+}
+
 uint64
 sys_open(void)
 {
@@ -311,6 +355,14 @@ sys_open(void)
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
+      end_op();
+      return -1;
+    }
+  }
+
+  if(ip->type == T_SYMLINK && (omode & O_NOFOLLOW) == 0){ // it's a symbol link
+    ip = symlink_walk(ip);
+    if (ip == 0){
       end_op();
       return -1;
     }
@@ -482,5 +534,32 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64
+sys_symlink(void)
+{
+  char new[MAXPATH], old[MAXPATH];
+  struct inode *ip;
+
+  if(argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+
+  // create a file on new path
+  ip = create(new, T_SYMLINK, 0, 0);
+  if(ip == 0){
+    end_op();
+    return -1;
+  }
+  char *store_path = (char *)ip->addrs; // use addrs array(208 bits) to store old path which max to 128 bits
+  strncpy(store_path, old, strlen(old));
+  iupdate(ip);
+  iunlockput(ip);
+
+  end_op();
+
   return 0;
 }
