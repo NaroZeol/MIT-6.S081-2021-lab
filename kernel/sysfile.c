@@ -555,23 +555,41 @@ sys_munmap(void)
   // printf("munmap(%p, %d)\n", addr, lenth);
 
   // write back
-  if(me->flags & MAP_SHARED){
-    for(i = 0; i <= (lenth+PGSIZE - 1)/PGSIZE * PGSIZE; i++){
-      uint64 va = addr + PGSIZE * i;
-      uint n = (addr + lenth - va > PGSIZE) ? PGSIZE : (addr + lenth - va);
-      uint64 pa = walkaddr(p->pagetable, va);
+  uint64 va = 0;
+  int npages = (lenth+PGSIZE - 1)/PGSIZE;
 
+  for(i = 0; i < npages; i++){
+    va = addr + PGSIZE * i;
+    uint n = (addr + lenth - va > PGSIZE) ? PGSIZE : (addr + lenth - va);
+    uint64 pa = walkaddr(p->pagetable, va);
+    if(pa == 0)
+      continue;
+
+    // write back
+    if(me->flags & MAP_SHARED){
       begin_op();
       ilock(me->f->ip);
+      // printf("writei(%p, %d, %p, %d, %d)\n", me->f->ip, 0, pa, va - addr, n);
       writei(me->f->ip, 0, pa, va - addr, n);
       iunlock(me->f->ip);
       end_op();
     }
+
+    // printf("uvmunmap(%p, %p, %d, %d)\n", p->pagetable, va, 1, 1);
+    uvmunmap(p->pagetable, va, 1, 1); // no recycle❗❗❗❗
   }
 
-  // printf("uvmunmap(%p, %p, %d, %d)\n", p->pagetable, me->addr, (lenth + PGSIZE - 1) / PGSIZE, 1);
-  uvmunmap(p->pagetable, me->addr, (lenth + PGSIZE - 1) / PGSIZE, 1); // no recycle❗❗❗❗
-  me->valid = 0;
+  if(va != 0 && va + PGSIZE < PGROUNDDOWN(me->addr + me->length)){
+    me->addr = va + PGSIZE;
+    me->length -= npages * PGSIZE;
+    // printf("me->addr = %p\n", me->addr);
+    // printf("me->length = %d\n", me->length);
+  }
+  else{
+    // printf("me->valid = 0\n");
+    me->valid = 0;
+  }
+
   filedup(me->f);
 
   return 0;
