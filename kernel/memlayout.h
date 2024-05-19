@@ -62,6 +62,9 @@
 //   fixed-size stack
 //   expandable heap
 //   ...
+//   MAPTRACK (p->maptrack, used by mmap)
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
+
+#define MAPTRACK (TRAPFRAME - PGSIZE)

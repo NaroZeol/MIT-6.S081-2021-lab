@@ -80,6 +80,17 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
+#define MAPENTRY_SIZE 16 // 4096 / 256 = 16
+struct mapentry // 256 bits (if no align)
+{
+  int valid;          // is this entry valid ?
+  uint64 addr;
+  int length;
+  int prot;
+  int flags;
+  struct file *f;
+};
+
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
@@ -101,6 +112,7 @@ struct proc {
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table
   struct trapframe *trapframe; // data page for trampoline.S
+  struct mapentry *maptrack;   // track of what mmap has mapped for each process
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
