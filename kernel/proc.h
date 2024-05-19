@@ -84,10 +84,10 @@ struct trapframe {
 struct mapentry // 256 bits (if no align)
 {
   int valid;          // is this entry valid ?
-  uint64 addr;
   int length;
   int prot;
   int flags;
+  uint64 addr;
   struct file *f;
 };
 

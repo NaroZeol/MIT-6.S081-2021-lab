@@ -37,7 +37,7 @@ void
 usertrap(void)
 {
   int which_dev = 0;
-
+  uint64 scause = r_scause();
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
@@ -50,7 +50,7 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+  if(scause== 8){
     // system call
 
     if(p->killed)
@@ -67,7 +67,25 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }else if(scause == 15 || scause == 13 || scause == 12){// 13->load, 15->store, 12->instruction
+    // page fault
+    uint64 faultva = r_stval(); // fault virtual memory address
+    uint64 faultpc = r_sepc(); // the virtual memory address of instruction that cause page fault
+    struct mapentry *maptrack = p->maptrack;
+    p->trapframe->epc = faultpc;
+
+    int find = 0;
+    for(int i = 0; i < MAPENTRY_SIZE; ++i){
+      if (maptrack[i].valid == 1 && maptrack[i].addr <= faultva && faultva < (maptrack[i].addr + maptrack[i].length)){ // find map!
+        fix_page(PGROUNDDOWN(faultva), &maptrack[i]);
+        find = 1;
+      }
+    }
+    if (find != 1)
+      goto err;
+  } 
+  else {
+  err:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;

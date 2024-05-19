@@ -489,15 +489,38 @@ uint64
 sys_mmap(void)
 {
   uint64 addr;
-  int lenth, prot, flags, fd, offset;
+  int length, prot, flags, fd, offset;
   struct file *f;
   const uint64 map_fault = 0xffffffffffffffff;
 
-  if (argaddr(0, &addr) < 0 || argint(1, &lenth) < 0 || argint(2, &prot) < 0 ||
+  if (argaddr(0, &addr) < 0 || argint(1, &length) < 0 || argint(2, &prot) < 0 ||
       argint(3, &flags) || argfd(4, &fd, &f) < 0 || argint(5, &offset) < 0)
       return map_fault;
 
-  return map_fault;
+  struct proc *p = myproc();
+  struct mapentry *maptrack = p->maptrack;
+
+  int i;
+  for (i = 0; i < MAPENTRY_SIZE; i++)
+    if(maptrack[i].valid == 0) // find a free track slot
+      break;
+  if(i == MAPENTRY_SIZE)
+    return map_fault;
+  
+  addr = PGROUNDUP(p->sz);
+  p->sz = PGROUNDUP(addr + length); // increase size but do not alloc
+  
+  maptrack[i].valid   = 1;
+  maptrack[i].addr    = addr;
+  maptrack[i].length  = length;
+  maptrack[i].prot    = prot;
+  maptrack[i].flags   = flags;
+  maptrack[i].f       = f;
+
+  filedup(f);
+
+  // printf("mmap %p, length: %d\n", addr, length);
+  return addr;
 }
 
 uint64
@@ -509,5 +532,23 @@ sys_munmap(void)
   if (argaddr(0, &addr) < 0 || argint(1, &lenth) < 0)
     return -1;
   
-  return -1;
+  struct proc *p = myproc();
+  struct mapentry *maptrack = p->maptrack;
+  
+  int i;
+  for (i = 0; i < MAPENTRY_SIZE; i++){
+    if(maptrack[i].valid && addr == maptrack[i].addr){
+      break;
+    }
+  }
+  if(i == MAPENTRY_SIZE)
+    return -1;
+
+  // printf("munmap %p, length: %d\n", maptrack[i].addr, maptrack[i].length);
+
+  uvmunmap(p->pagetable, maptrack[i].addr, (maptrack[i].length + PGSIZE - 1) / PGSIZE, 1); // no recycle
+  maptrack[i].valid = 0;
+  filedup(maptrack[i].f);
+
+  return 0;
 }

@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct mapentry;
 
 // bio.c
 void            binit(void);
@@ -53,6 +54,7 @@ int             readi(struct inode*, int, uint64, uint, uint);
 void            stati(struct inode*, struct stat*);
 int             writei(struct inode*, int, uint64, uint, uint);
 void            itrunc(struct inode*);
+int             fix_page(uint64, struct mapentry *);
 
 // ramdisk.c
 void            ramdiskinit(void);

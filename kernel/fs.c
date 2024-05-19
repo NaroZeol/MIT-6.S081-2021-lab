@@ -20,6 +20,7 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
+#include "fcntl.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 // there should be one superblock per disk device, but we run with
@@ -671,4 +672,75 @@ struct inode*
 nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
+}
+
+// fix mapped page with mapentry
+// va should align to page size
+int
+fix_page(uint64 va, struct mapentry *me)
+{
+  if(va % PGSIZE != 0){
+    return -1;
+  }
+
+  struct proc *p = myproc();
+  struct file *f = me->f;
+  
+  int perm = 0;
+  if(me->prot & PROT_WRITE)
+    perm |= PTE_W;
+  if(me->prot & PROT_READ)
+    perm |= PTE_R;
+  if(me->prot & PROT_EXEC)
+    perm |= PTE_X;
+
+  if(va == me->addr){ // just at begin
+    uint64 mem = (uint64)kalloc();
+    if(mem == 0)
+      return -1;
+
+    ilock(f->ip);
+    readi(f->ip, 0, mem, 0, PGSIZE);  
+    iunlock(f->ip);
+
+    // printf("mappages(%p, %p, %d, %p, %d)\n", p->pagetable, va, PGSIZE, mem, perm | PTE_U);
+
+    if (mappages(p->pagetable, va, PGSIZE, mem, perm | PTE_U) < 0){
+      kfree((void *)mem);
+      // printf("map fault!\n");
+      return -1;
+    }
+    return 0;
+  }
+  else if(va < me->addr){ // head, assume that this page has been allocated
+    int offset = me->addr - va;
+    uint64 pa = walkaddr(p->pagetable, va);
+    int fill = PGSIZE - offset;
+
+    ilock(f->ip);
+    readi(f->ip, 0, pa, 0, fill);
+    iunlock(f->ip);
+
+    return 0;
+  }
+  else if (me->addr < va){ // normal case
+    int offset = va - me->addr;
+    int fill = me->addr + me->length - va; 
+    fill = (fill > PGSIZE) ? PGSIZE : fill;
+    
+    uint64 mem = (uint64)kalloc();
+    memset((void*)mem, 0, PGSIZE);
+    if (mem == 0)
+      return -1;
+    
+    ilock(f->ip);
+    readi(f->ip, 0, mem, offset, fill);
+    iunlock(f->ip);
+
+    // printf("mappages(%p, %p, %d, %p, %d)\n", p->pagetable, va, fill, mem, perm | PTE_U);
+
+    mappages(p->pagetable, va, fill, mem, perm | PTE_U);
+    return 0;
+  }
+  return -1;
 }
