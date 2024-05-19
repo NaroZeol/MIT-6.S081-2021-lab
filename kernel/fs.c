@@ -713,14 +713,14 @@ fix_page(uint64 va, struct mapentry *me)
     return 0;
   }
   else if(va < me->addr){ // head, assume that this page has been allocated
-    int offset = me->addr - va;
-    uint64 pa = walkaddr(p->pagetable, va);
-    int fill = PGSIZE - offset;
+    // int offset = me->addr - va;
+    // uint64 pa = walkaddr(p->pagetable, va);
+    // int fill = PGSIZE - offset;
 
-    ilock(f->ip);
-    readi(f->ip, 0, pa, 0, fill);
-    iunlock(f->ip);
-
+    // ilock(f->ip);
+    // readi(f->ip, 0, pa, 0, fill);
+    // iunlock(f->ip);
+    printf("bad hit\n");
     return 0;
   }
   else if (me->addr < va){ // normal case

@@ -500,6 +500,11 @@ sys_mmap(void)
   struct proc *p = myproc();
   struct mapentry *maptrack = p->maptrack;
 
+  if((flags & MAP_SHARED) && f->readable == 0 && (prot & PROT_READ)) // read fault
+    return map_fault;
+  if((flags & MAP_SHARED) && f->writable == 0 && (prot & PROT_WRITE)) // write fault
+    return map_fault;
+
   int i;
   for (i = 0; i < MAPENTRY_SIZE; i++)
     if(maptrack[i].valid == 0) // find a free track slot
@@ -519,7 +524,7 @@ sys_mmap(void)
 
   filedup(f);
 
-  // printf("mmap %p, length: %d\n", addr, length);
+  // printf("mmap(%p, %d)\n", addr, length);
   return addr;
 }
 
@@ -534,7 +539,8 @@ sys_munmap(void)
   
   struct proc *p = myproc();
   struct mapentry *maptrack = p->maptrack;
-  
+  struct mapentry *me;
+
   int i;
   for (i = 0; i < MAPENTRY_SIZE; i++){
     if(maptrack[i].valid && addr == maptrack[i].addr){
@@ -544,11 +550,29 @@ sys_munmap(void)
   if(i == MAPENTRY_SIZE)
     return -1;
 
-  // printf("munmap %p, length: %d\n", maptrack[i].addr, maptrack[i].length);
+  me = &maptrack[i];
 
-  uvmunmap(p->pagetable, maptrack[i].addr, (maptrack[i].length + PGSIZE - 1) / PGSIZE, 1); // no recycle
-  maptrack[i].valid = 0;
-  filedup(maptrack[i].f);
+  // printf("munmap(%p, %d)\n", addr, lenth);
+
+  // write back
+  if(me->flags & MAP_SHARED){
+    for(i = 0; i <= (lenth+PGSIZE - 1)/PGSIZE * PGSIZE; i++){
+      uint64 va = addr + PGSIZE * i;
+      uint n = (addr + lenth - va > PGSIZE) ? PGSIZE : (addr + lenth - va);
+      uint64 pa = walkaddr(p->pagetable, va);
+
+      begin_op();
+      ilock(me->f->ip);
+      writei(me->f->ip, 0, pa, va - addr, n);
+      iunlock(me->f->ip);
+      end_op();
+    }
+  }
+
+  // printf("uvmunmap(%p, %p, %d, %d)\n", p->pagetable, me->addr, (lenth + PGSIZE - 1) / PGSIZE, 1);
+  uvmunmap(p->pagetable, me->addr, (lenth + PGSIZE - 1) / PGSIZE, 1); // no recycle❗❗❗❗
+  me->valid = 0;
+  filedup(me->f);
 
   return 0;
 }
