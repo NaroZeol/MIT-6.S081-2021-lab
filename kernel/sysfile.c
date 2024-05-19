@@ -484,3 +484,30 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void)
+{
+  uint64 addr;
+  int lenth, prot, flags, fd, offset;
+  struct file *f;
+  const uint64 map_fault = 0xffffffffffffffff;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &lenth) < 0 || argint(2, &prot) < 0 ||
+      argint(3, &flags) || argfd(4, &fd, &f) < 0 || argint(5, &offset) < 0)
+      return map_fault;
+
+  return map_fault;
+}
+
+uint64
+sys_munmap(void)
+{
+  uint64 addr;
+  int lenth;
+
+  if (argaddr(0, &addr) < 0 || argint(1, &lenth) < 0)
+    return -1;
+  
+  return -1;
+}
