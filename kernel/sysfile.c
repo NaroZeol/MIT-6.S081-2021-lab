@@ -576,7 +576,7 @@ sys_munmap(void)
     }
 
     // printf("uvmunmap(%p, %p, %d, %d)\n", p->pagetable, va, 1, 1);
-    uvmunmap(p->pagetable, va, 1, 1); // no recycle❗❗❗❗
+    uvmunmap(p->pagetable, va, 1, 1); // no recycle❗❗❗❗ -> dirty hack!
   }
 
   if(va != 0 && va + PGSIZE < PGROUNDDOWN(me->addr + me->length)){
