@@ -318,8 +318,11 @@ fork(void)
   *(np->trapframe) = *(p->trapframe);
 
   // copy maptrack frame.
-  for(i = 0; i < MAPENTRY_SIZE; i++)
+  for(i = 0; i < MAPENTRY_SIZE; i++){
     np->maptrack[i] = p->maptrack[i];
+    if(p->maptrack[i].valid && p->maptrack[i].f != 0)
+      filedup(p->maptrack[i].f);
+  }
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
