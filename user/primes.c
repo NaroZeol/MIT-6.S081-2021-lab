@@ -72,6 +72,7 @@ int main () {
             if (data == -1) {
                 if (child_pid != -1) // if still have child, pass end signal(-1) to child
                     write(childfd, (void *)&data, sizeof(int) * 1);
+                wait(0);
                 exit(0);
             }
             else if (data % sieve == 0)
@@ -86,9 +87,10 @@ int main () {
         }
     }
     else {
-        sleep(10);
+        // sleep(10);
         int end = -1;
         write(childfd, (void *)&end, sizeof(int) * 1); // send end signal(-1) to child
+        wait(0);
     }
 
     exit(0);
