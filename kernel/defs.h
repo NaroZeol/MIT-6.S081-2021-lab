@@ -66,6 +66,8 @@ void            kinit(void);
 int             pgrefcountinc(uint64);
 int             pgrefcountdec(uint64);
 int             pgrefcnt(uint64);
+void            lockpgref();
+void            unlockpgref();
 
 // log.c
 void            initlog(int, struct superblock*);

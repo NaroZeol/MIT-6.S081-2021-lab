@@ -92,8 +92,20 @@ usertrap(void)
     }
 
     // Alloc and Copy!
-    if (uvmalloccopy(p->pagetable, faultva, faultpa) == -1)
+    if ((*pte & PTE_COW) && (*pte & PTE_V)){
+      int alloc = 1;
+
+      lockpgref();
+      if (pgrefcnt(PGROUNDDOWN(faultpa)) == 1) {
+        *pte = ((*pte | PTE_W) & (~PTE_COW));
+        alloc = 0;
+      }
+      unlockpgref();
+
+    if (alloc && uvmalloccopy(p->pagetable, faultva, faultpa) == -1)
       p->killed = 1;
+    }
+
   } 
   else if((which_dev = devintr()) != 0){
     // ok

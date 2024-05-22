@@ -15,6 +15,7 @@ extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
 uint16 pgrefcount[REFSIZE];
+struct spinlock pgreflock;
 
 struct run {
   struct run *next;
@@ -29,6 +30,7 @@ void
 initpgrefcount()
 {
   // memset(kmem.pgrefcount, 128, PGSIZE);
+  initlock(&pgreflock, "pgref");
   for (int i = 0; i != REFSIZE; ++i)
     pgrefcount[i] = 0;
 }
@@ -50,9 +52,22 @@ freerange(void *pa_start, void *pa_end)
     kfree(p);
 }
 
+void
+lockpgref()
+{
+  acquire(&pgreflock);
+}
+
+void
+unlockpgref()
+{
+  release(&pgreflock);
+}
+
 // increase a page reference count use physical address
 // pa should align to page size
 // return new value when success, -1 when failed
+// should hold pgreflock
 int
 pgrefcountinc(uint64 pa)
 {
@@ -61,12 +76,8 @@ pgrefcountinc(uint64 pa)
   }
 
   uint16 ret;
-  acquire(&kmem.lock);
   // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
-  *num += 1;
-  ret = *num;
-  release(&kmem.lock);
+  ret = ++pgrefcount[(uint64)pa / PGSIZE];
 
   return ret;
 }
@@ -74,6 +85,7 @@ pgrefcountinc(uint64 pa)
 // decrease a page reference count use physical address
 // pa should align to page size
 // return new value when success, -1 when failed
+// should hold pgreflock
 int
 pgrefcountdec(uint64 pa)
 {
@@ -82,17 +94,14 @@ pgrefcountdec(uint64 pa)
   }
 
   uint16 ret;
-  acquire(&kmem.lock);
   // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
-  *num -= 1;
-  ret = *num;
-  release(&kmem.lock);
+  ret = --pgrefcount[(uint64)pa / PGSIZE];
 
   return ret;  
 }
 
 // return page reference count by physical address, pa should align to page size
+// should hold pgreflock
 int
 pgrefcnt(uint64 pa)
 {
@@ -101,16 +110,13 @@ pgrefcnt(uint64 pa)
   }
 
   uint16 ret;
-  acquire(&kmem.lock);
   // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
-  ret = *num;
-  release(&kmem.lock);
+  ret = pgrefcount[(uint64)pa / PGSIZE];
 
   return ret;    
 }
 
-// no lock, only for kfree and kalloc
+// should hold pgreflock
 int
 pgrefcountset(uint64 pa, uint16 val)
 {
@@ -119,8 +125,7 @@ pgrefcountset(uint64 pa, uint16 val)
   }
 
   // uint64 relativeaddr = pa - (PGROUNDUP((uint64)end));
-  uint16 *num = &pgrefcount[(uint64)pa / PGSIZE];
-  *num = val;
+  pgrefcount[(uint64)pa / PGSIZE] = val;
   return 0;   
 }
 

@@ -180,10 +180,12 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not a leaf");
     if(do_free){
       uint64 pa = PTE2PA(*pte);
+      lockpgref();
       if (pgrefcountdec(pa) == -1)
         panic("uvmunmap: wrong physical address");
       if (pgrefcnt(pa) == 0) // may be race condition
         kfree((void*)pa);
+      unlockpgref();
     }
     *pte = 0;
   }
@@ -322,8 +324,12 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: wrong when mappages\n");
       goto err;
     }
-    if (pgrefcountinc(pa) == -1)
+    lockpgref();
+    if (pgrefcountinc(pa) == -1) {
+      unlockpgref();
       goto err;
+    }
+    unlockpgref();
   }
   return 0;
 
