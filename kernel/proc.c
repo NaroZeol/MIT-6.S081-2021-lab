@@ -376,6 +376,13 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
+  // TODO❗: unmap mapped memory
+  // for (int i = 0; i != MAPENTRY_SIZE; ++i) {
+  //   if (p->maptrack[i].valid == 1) {
+      
+  //   }
+  // }
+
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
