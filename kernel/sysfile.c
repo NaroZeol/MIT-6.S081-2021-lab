@@ -543,7 +543,7 @@ sys_munmap(void)
 
   int i;
   for (i = 0; i < MAPENTRY_SIZE; i++){
-    if(maptrack[i].valid && addr == maptrack[i].addr){
+    if(maptrack[i].valid && (maptrack[i].addr <= addr && addr < (maptrack[i].addr + maptrack[i].length))){
       break;
     }
   }
@@ -579,8 +579,10 @@ sys_munmap(void)
     uvmunmap(p->pagetable, va, 1, 1); // no recycle❗❗❗❗ -> dirty hack!
   }
 
-  if(va != 0 && va + PGSIZE < PGROUNDDOWN(me->addr + me->length)){
-    me->addr = va + PGSIZE;
+  if(npages * PGSIZE < me->length){ // don't use up all map space
+    if (me->addr == addr) {// if addr is head of map space
+      me->addr = addr + npages * PGSIZE;
+    }
     me->length -= npages * PGSIZE;
     // printf("me->addr = %p\n", me->addr);
     // printf("me->length = %d\n", me->length);
@@ -588,9 +590,9 @@ sys_munmap(void)
   else{
     // printf("me->valid = 0\n");
     me->valid = 0;
+    fileclose(me->f);
   }
 
-  filedup(me->f);
 
   return 0;
 }

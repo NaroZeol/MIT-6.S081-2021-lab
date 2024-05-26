@@ -80,8 +80,8 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
-#define MAPENTRY_SIZE 16 // 4096 / 256 = 16
-struct mapentry // 256 bits (if no align)
+#define MAPENTRY_SIZE  128// 4096 / 32 = 128
+struct mapentry //  32 bytes (if no align)
 {
   int valid;          // is this entry valid ?
   int length;
