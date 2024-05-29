@@ -127,11 +127,17 @@ found:
     return 0;
   }
 
-  // Allocate a maptrack page
-  if((p->maptrack = (struct mapentry *)kalloc()) == 0){
-    freeproc(p);
-    release(&p->lock);
-    return 0;
+  // Allocate mmappages for mmap
+  // for (int i = 0; i < MAPPAGES_SIZE; ++i) {
+  //   p->mmappages[i] = 0;
+  // }
+  for (int i = 0; i < MAPPAGES_SIZE; ++i) {
+    if ((p->mmappages[i] = (uint64)kalloc()) == 0){
+      freeproc(p);
+      release(&p->lock);
+      return 0;
+    }
+    p->mmappagesflag[i] = -1; // alloc physical page but not map to user space
   }
 
   // An empty user page table.
@@ -159,10 +165,12 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
-  if(p->maptrack)
-    kfree((void*)p->maptrack);
   p->trapframe = 0;
-  p->maptrack = 0;
+  for (int i = 0; i < MAPPAGES_SIZE; ++i) {
+    if (p->mmappages[i] != 0)
+      kfree((void*)p->mmappages[i]);
+    p->mmappages[i] = 0;
+  }
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -206,13 +214,20 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
-  // map the maptrack just below trapframe
-  if(mappages(pagetable, MAPTRACK, PGSIZE,
-              (uint64)(p->maptrack), PTE_R | PTE_W) < 0){
-    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
-    uvmunmap(pagetable, TRAPFRAME, 1, 0);
-    uvmfree(pagetable, 0);
-    return 0;
+  // map the mapframe just below trapframe, for mmap
+  for (int i = 0; i != MAPPAGES_SIZE; ++i) {
+    if(mappages(pagetable, MAPFRAME + i * PGSIZE, PGSIZE, 
+                p->mmappages[i], PTE_R | PTE_X) < 0){
+      uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+      uvmunmap(pagetable, TRAPFRAME, 1, 0);
+      for (int j = 0; j != MAPPAGES_SIZE; ++j) {
+        if (p->mmappagesflag[j] != -1)
+          uvmunmap(pagetable, MAPFRAME + j * PGSIZE, 1, 0);
+      }
+      uvmfree(pagetable, 0);
+      return 0;
+    }
+    p->mmappagesflag[i] = 0; // unused
   }
 
   return pagetable;
@@ -225,7 +240,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
-  uvmunmap(pagetable, MAPTRACK, 1, 0);
+  uvmunmap(pagetable, MAPFRAME, MAPPAGES_SIZE, 0);
   uvmfree(pagetable, sz);
 }
 
@@ -260,7 +275,7 @@ userinit(void)
   p->trapframe->sp = PGSIZE;  // user stack pointer
 
   // init maptrack frame
-  for (int i = 0; i != MAPENTRY_SIZE; ++i){
+  for (int i = 0; i != MAPTRACK_SIZE; ++i){
     p->maptrack[i].valid = 0; // invalid
   }
 
@@ -318,7 +333,7 @@ fork(void)
   *(np->trapframe) = *(p->trapframe);
 
   // copy maptrack frame.
-  for(i = 0; i < MAPENTRY_SIZE; i++){
+  for(i = 0; i < MAPTRACK_SIZE; i++){
     np->maptrack[i] = p->maptrack[i];
     if(p->maptrack[i].valid && p->maptrack[i].f != 0)
       filedup(p->maptrack[i].f);

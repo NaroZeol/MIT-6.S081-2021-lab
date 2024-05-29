@@ -80,7 +80,8 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
-#define MAPENTRY_SIZE  128// 4096 / 32 = 128
+#define MAPTRACK_SIZE  16
+#define MAPPAGES_SIZE 16
 struct mapentry //  32 bytes (if no align)
 {
   int valid;          // is this entry valid ?
@@ -111,8 +112,10 @@ struct proc {
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table
+  uint64 mmappages[MAPPAGES_SIZE];  // mmap pages for mmap (MAPTRACE_SIZE pages)
+  int mmappagesflag[MAPTRACK_SIZE]; // mmap pages flag for mmap (0: unused, 1: used, -1: unallocated)
   struct trapframe *trapframe; // data page for trampoline.S
-  struct mapentry *maptrack;   // track of what mmap has mapped for each process
+  struct mapentry maptrack[MAPTRACK_SIZE];   // track of what mmap has mapped for each process
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory

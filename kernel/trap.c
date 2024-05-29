@@ -75,7 +75,7 @@ usertrap(void)
     p->trapframe->epc = faultpc;
 
     int find = 0;
-    for(int i = 0; i < MAPENTRY_SIZE; ++i){
+    for(int i = 0; i < MAPTRACK_SIZE; ++i){
       if (maptrack[i].valid == 1 && maptrack[i].addr <= faultva && faultva < (maptrack[i].addr + maptrack[i].length)){ // find map!
         fix_page(PGROUNDDOWN(faultva), &maptrack[i]);
         find = 1;

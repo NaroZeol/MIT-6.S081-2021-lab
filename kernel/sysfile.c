@@ -506,14 +506,34 @@ sys_mmap(void)
     return map_fault;
 
   int i;
-  for (i = 0; i < MAPENTRY_SIZE; i++)
+  for (i = 0; i < MAPTRACK_SIZE; i++)
     if(maptrack[i].valid == 0) // find a free track slot
       break;
-  if(i == MAPENTRY_SIZE)
+  if(i == MAPTRACK_SIZE)
     return map_fault;
   
-  addr = PGROUNDUP(p->sz);
-  p->sz = PGROUNDUP(addr + length); // increase size but do not alloc
+  int npages = (length+PGSIZE - 1)/PGSIZE;
+  if (npages == 0)
+    return map_fault;
+  for (i = 0; i < MAPPAGES_SIZE;) {
+    int j = 0;
+    int cnt = 0;
+    for (j = i; j < i + npages; j++) {
+      if (p->mmappagesflag[j] == 0) // find a free page
+        cnt += 1;
+      else
+        break;
+    }
+    if (cnt == npages) // find a region which suit for mmap
+      break;
+    else
+      i = j + 1;
+  }
+  if (i == MAPPAGES_SIZE)
+    return map_fault;
+  addr = p->mmappages[i];
+  for (int j = i; j < i + npages; j++)
+    p->mmappagesflag[j] = 1; // mark as used
   
   maptrack[i].valid   = 1;
   maptrack[i].addr    = addr;
@@ -542,12 +562,12 @@ sys_munmap(void)
   struct mapentry *me;
 
   int i;
-  for (i = 0; i < MAPENTRY_SIZE; i++){
+  for (i = 0; i < MAPTRACK_SIZE; i++){
     if(maptrack[i].valid && (maptrack[i].addr <= addr && addr < (maptrack[i].addr + maptrack[i].length))){
       break;
     }
   }
-  if(i == MAPENTRY_SIZE)
+  if(i == MAPTRACK_SIZE)
     return -1;
 
   me = &maptrack[i];
@@ -576,7 +596,10 @@ sys_munmap(void)
     }
 
     // printf("uvmunmap(%p, %p, %d, %d)\n", p->pagetable, va, 1, 1);
-    uvmunmap(p->pagetable, va, 1, 1); // no recycle❗❗❗❗ -> dirty hack!
+    uvmunmap(p->pagetable, va, 1, 0); // no recycle❗❗❗❗ -> dirty hack!
+    for (int i = 0; i != MAPPAGES_SIZE; ++i)
+      if (p->mmappages[i] == va)
+        p->mmappagesflag[i] = 0;
   }
 
   if(npages * PGSIZE < me->length){ // don't use up all map space

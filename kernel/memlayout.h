@@ -67,4 +67,4 @@
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
 
-#define MAPTRACK (TRAPFRAME - PGSIZE)
+#define MAPFRAME (TRAPFRAME - PGSIZE * 16) // 16 pages for mmap
