@@ -95,6 +95,7 @@ struct mapentry //  32 bytes (if no align)
 struct mapstate
 {
   int maped;
+  int used;
   uint64 va; // address this mapstate entry correspond to
   uint64 pa; // physical address
 };

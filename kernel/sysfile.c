@@ -519,7 +519,7 @@ sys_mmap(void)
     int j = 0;
     int cnt = 0;
     for (j = i; j < i + npages; j++) {
-      if (p->mappagestate[j].maped == 0) // find a free page
+      if (p->mappagestate[j].used == 0) // find a free page
         cnt += 1;
       else
         break;
@@ -533,7 +533,7 @@ sys_mmap(void)
     return map_fault;
   addr = p->mappagestate[i].va;
   for (int j = i; j < i + npages; j++)
-    p->mappagestate[j].maped = 1;
+    p->mappagestate[j].used = 1;
   
   maptrack[i].valid   = 1;
   maptrack[i].addr    = addr;
@@ -601,6 +601,7 @@ sys_munmap(void)
       if (p->mappagestate[i].va == va){
         if (p->mappagestate[i].pa != 0)
           kfree((void *)p->mappagestate[i].pa);
+        p->mappagestate[i].used = 0;
         p->mappagestate[i].maped = 0;
         p->mappagestate[i].pa = 0;
         break;

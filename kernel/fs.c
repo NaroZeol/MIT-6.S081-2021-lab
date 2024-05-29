@@ -710,17 +710,13 @@ fix_page(uint64 va, struct mapentry *me)
       // printf("map fault!\n");
       return -1;
     }
-    return 0;
-  }
-  else if(va < me->addr){ // head, assume that this page has been allocated
-    // int offset = me->addr - va;
-    // uint64 pa = walkaddr(p->pagetable, va);
-    // int fill = PGSIZE - offset;
-
-    // ilock(f->ip);
-    // readi(f->ip, 0, pa, 0, fill);
-    // iunlock(f->ip);
-    printf("bad hit\n");
+    for (int i = 0; i < MAPPAGES_SIZE; i++){
+      if (p->mappagestate[i].va == va){
+        p->mappagestate[i].maped = 1;
+        p->mappagestate[i].pa = mem;
+        break;
+      }
+    }
     return 0;
   }
   else if (me->addr < va){ // normal case
@@ -738,8 +734,14 @@ fix_page(uint64 va, struct mapentry *me)
     iunlock(f->ip);
 
     // printf("mappages(%p, %p, %d, %p, %d)\n", p->pagetable, va, fill, mem, perm | PTE_U);
-
     mappages(p->pagetable, va, fill, mem, perm | PTE_U);
+    for (int i = 0; i < MAPPAGES_SIZE; i++){
+      if (p->mappagestate[i].va == va){
+        p->mappagestate[i].maped = 1;
+        p->mappagestate[i].pa = mem;
+        break;
+      }
+    }
     return 0;
   }
   return -1;

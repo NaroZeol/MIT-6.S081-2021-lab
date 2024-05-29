@@ -133,6 +133,7 @@ found:
   // }
   for (int i = 0; i < MAPPAGES_SIZE; ++i) {
     p->mappagestate[i].maped = 0;
+    p->mappagestate[i].used = 0;
     p->mappagestate[i].va = MAPFRAME + i * PGSIZE; // should not be changed since a process is created
     p->mappagestate[i].pa = 0;
   }
@@ -166,6 +167,7 @@ freeproc(struct proc *p)
   for(int i = 0; i < MAPPAGES_SIZE; i++){
     if (p->mappagestate[i].pa != 0){
       kfree((void*)p->mappagestate[i].pa);
+      p->mappagestate[i].pa = 0;
     }
   }
 
@@ -220,9 +222,14 @@ proc_pagetable(struct proc *p)
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
+  struct proc *p = myproc();
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
-  uvmunmap(pagetable, MAPFRAME, MAPPAGES_SIZE, 0);
+  for (int i = 0; i < MAPPAGES_SIZE; i++){
+    if (p->mappagestate[i].pa != 0){ // if pa is not 0, it means this page must be mapped
+      uvmunmap(pagetable, p->mappagestate[i].va, 1, 0);
+    }
+  }
   uvmfree(pagetable, sz);
 }
 
@@ -322,10 +329,11 @@ fork(void)
   }
 
   for (i = 0; i < MAPPAGES_SIZE; i++){ // TODO
-    if (p->mappagestate[i].maped == 0)
+    if (p->mappagestate[i].used == 0)
       continue;
 
     np->mappagestate[i].maped = p->mappagestate[i].maped;
+    np->mappagestate[i].used = p->mappagestate[i].used;
     np->mappagestate[i].va = p->mappagestate[i].va;
     // copy the physical memory if parent has mapped it
     if (p->mappagestate[i].pa != 0){
@@ -417,6 +425,8 @@ exit(int status)
     if (p->mappagestate[i].maped == 1){
       if (p->mappagestate[i].pa != 0){
         kfree((void*)p->mappagestate[i].pa);
+        uvmunmap(p->pagetable, p->mappagestate[i].va, 1, 0);
+        p->mappagestate[i].pa = 0;
       }
     }
   }
@@ -448,8 +458,8 @@ exit(int status)
   p->xstate = status;
   p->state = ZOMBIE;
 
-  release(&wait_lock);
 
+  release(&wait_lock);
   // Jump into the scheduler, never to return.
   sched();
   panic("zombie exit");
