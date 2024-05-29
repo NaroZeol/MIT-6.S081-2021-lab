@@ -519,7 +519,7 @@ sys_mmap(void)
     int j = 0;
     int cnt = 0;
     for (j = i; j < i + npages; j++) {
-      if (p->mmappagesflag[j] == 0) // find a free page
+      if (p->mappagestate[j].maped == 0) // find a free page
         cnt += 1;
       else
         break;
@@ -531,9 +531,9 @@ sys_mmap(void)
   }
   if (i == MAPPAGES_SIZE)
     return map_fault;
-  addr = p->mmappages[i];
+  addr = p->mappagestate[i].va;
   for (int j = i; j < i + npages; j++)
-    p->mmappagesflag[j] = 1; // mark as used
+    p->mappagestate[j].maped = 1;
   
   maptrack[i].valid   = 1;
   maptrack[i].addr    = addr;
@@ -596,10 +596,16 @@ sys_munmap(void)
     }
 
     // printf("uvmunmap(%p, %p, %d, %d)\n", p->pagetable, va, 1, 1);
-    uvmunmap(p->pagetable, va, 1, 0); // no recycle❗❗❗❗ -> dirty hack!
-    for (int i = 0; i != MAPPAGES_SIZE; ++i)
-      if (p->mmappages[i] == va)
-        p->mmappagesflag[i] = 0;
+    uvmunmap(p->pagetable, va, 1, 0);
+    for (int i = 0; i != MAPPAGES_SIZE; ++i){
+      if (p->mappagestate[i].va == va){
+        if (p->mappagestate[i].pa != 0)
+          kfree((void *)p->mappagestate[i].pa);
+        p->mappagestate[i].maped = 0;
+        p->mappagestate[i].pa = 0;
+        break;
+      }
+    }
   }
 
   if(npages * PGSIZE < me->length){ // don't use up all map space

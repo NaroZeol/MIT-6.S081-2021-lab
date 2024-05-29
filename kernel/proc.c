@@ -132,12 +132,9 @@ found:
   //   p->mmappages[i] = 0;
   // }
   for (int i = 0; i < MAPPAGES_SIZE; ++i) {
-    if ((p->mmappages[i] = (uint64)kalloc()) == 0){
-      freeproc(p);
-      release(&p->lock);
-      return 0;
-    }
-    p->mmappagesflag[i] = -1; // alloc physical page but not map to user space
+    p->mappagestate[i].maped = 0;
+    p->mappagestate[i].va = MAPFRAME + i * PGSIZE; // should not be changed since a process is created
+    p->mappagestate[i].pa = 0;
   }
 
   // An empty user page table.
@@ -166,11 +163,12 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  for (int i = 0; i < MAPPAGES_SIZE; ++i) {
-    if (p->mmappages[i] != 0)
-      kfree((void*)p->mmappages[i]);
-    p->mmappages[i] = 0;
+  for(int i = 0; i < MAPPAGES_SIZE; i++){
+    if (p->mappagestate[i].pa != 0){
+      kfree((void*)p->mappagestate[i].pa);
+    }
   }
+
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -212,22 +210,6 @@ proc_pagetable(struct proc *p)
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
-  }
-
-  // map the mapframe just below trapframe, for mmap
-  for (int i = 0; i != MAPPAGES_SIZE; ++i) {
-    if(mappages(pagetable, MAPFRAME + i * PGSIZE, PGSIZE, 
-                p->mmappages[i], PTE_R | PTE_X) < 0){
-      uvmunmap(pagetable, TRAMPOLINE, 1, 0);
-      uvmunmap(pagetable, TRAPFRAME, 1, 0);
-      for (int j = 0; j != MAPPAGES_SIZE; ++j) {
-        if (p->mmappagesflag[j] != -1)
-          uvmunmap(pagetable, MAPFRAME + j * PGSIZE, 1, 0);
-      }
-      uvmfree(pagetable, 0);
-      return 0;
-    }
-    p->mmappagesflag[i] = 0; // unused
   }
 
   return pagetable;
@@ -332,11 +314,51 @@ fork(void)
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
-  // copy maptrack frame.
+  // copy maptrack
   for(i = 0; i < MAPTRACK_SIZE; i++){
     np->maptrack[i] = p->maptrack[i];
     if(p->maptrack[i].valid && p->maptrack[i].f != 0)
       filedup(p->maptrack[i].f);
+  }
+
+  for (i = 0; i < MAPPAGES_SIZE; i++){ // TODO
+    if (p->mappagestate[i].maped == 0)
+      continue;
+
+    np->mappagestate[i].maped = p->mappagestate[i].maped;
+    np->mappagestate[i].va = p->mappagestate[i].va;
+    // copy the physical memory if parent has mapped it
+    if (p->mappagestate[i].pa != 0){
+      pte_t *pte;
+      uint64 pa;
+      uint flags;
+      char *mem;
+
+      if((pte = walk(p->pagetable, p->mappagestate[i].va, 0)) == 0)
+        panic("uvmcopy: pte should exist");
+      if((*pte & PTE_V) == 0)
+        continue;
+      pa = PTE2PA(*pte);
+      flags = PTE_FLAGS(*pte);
+      if((mem = kalloc()) == 0){ // free the memory if allocation failed
+        for (int j = 0; j < i; ++j){
+          if (np->mappagestate[j].pa != 0){
+            kfree((void*)np->mappagestate[j].pa);
+          }
+        }
+        return -1;
+      }
+      memmove(mem, (char*)pa, PGSIZE);
+      // printf("mappages(%p, %p, %d, %p, %d) -> uvmcopy call\n", new, i, PGSIZE, (uint64)mem, flags);
+      if(mappages(np->pagetable, p->mappagestate[i].va, PGSIZE, (uint64)mem, flags) != 0){
+        for (int j = 0; j < i; ++j){
+          if (np->mappagestate[j].pa != 0){
+            kfree((void*)np->mappagestate[j].pa);
+          }
+        }
+        return -1;
+      }
+    }
   }
 
   // Cause fork to return 0 in the child.
@@ -391,12 +413,13 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
-  // TODO❗: unmap mapped memory
-  // for (int i = 0; i != MAPENTRY_SIZE; ++i) {
-  //   if (p->maptrack[i].valid == 1) {
-      
-  //   }
-  // }
+  for (int i = 0; i != MAPPAGES_SIZE; ++i) {
+    if (p->mappagestate[i].maped == 1){
+      if (p->mappagestate[i].pa != 0){
+        kfree((void*)p->mappagestate[i].pa);
+      }
+    }
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
