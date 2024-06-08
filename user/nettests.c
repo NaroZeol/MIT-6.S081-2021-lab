@@ -183,14 +183,20 @@ dns_rep(uint8 *ibuf, int cc)
       printf("DNS arecord for %s is ", qname ? qname : "" );
       uint8 *ip = (ibuf+len);
       printf("%d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
-      if(ip[0] != 198 || ip[1] != 18 || ip[2] != 0 || ip[3] != 176) { 
+      if(ip[0] != 128 || ip[1] != 52 || ip[2] != 129 || ip[3] != 126) {
+      // if(ip[0] != 198 || ip[1] != 18 || ip[2] != 0 || ip[3] != 176) { 
         // nslookup show pdos.csail.mit.edu's ip is 198.18.0.176
         // I don't know why this is hard-coded
         
-        // Update:
+        // Update1:
         // If a vpn is used, the ip obtained by nslookup will be different
-        // If vpn is not used, the ip will be 128.52.129.126, but then you cannot access to google's DNS server in qemu.🤣
+        // If vpn is not used, the ip will be 128.52.129.126, but then you cannot access to google's DNS server in qemu.
         // Bad hard-coded !!!!!
+
+        // Update2:
+        // The real reason that make me can't access to google's DNS server is that
+        // WSL2 need to enable dnsTunneling (No exacatly sure, seems like a cache problem).
+        // See https://learn.microsoft.com/en-US/windows/wsl/networking#dns-tunneling
         printf("wrong ip address");
         exit(1);
       }
