@@ -82,10 +82,12 @@ usertrap(void)
         uint xticks;
         acquire(&tickslock);
         xticks = ticks;
+        wakeup(&ticks);
         release(&tickslock);
 
         if (p->isinalarm != 1 && xticks - p->lastticks >= p->alarminterval) {
           p->isinalarm = 1;
+          p->lastticks = xticks;
           memmove(p->alarmframe, p->trapframe, PGSIZE);
 
           p->trapframe->epc = p->alarmhandler;
